@@ -1,0 +1,71 @@
+---
+- name: Configurar unión a dominio Active Directory con realmd
+  hosts: all
+  vars_files:
+    - domain_info.yml
+  tasks:
+
+    - name: Instalar paquetes necesarios
+      apt:
+        name:
+          - realmd
+          - sssd
+          - sssd-tools
+          - samba-common
+          - krb5-user
+          - packagekit
+          - samba-common-bin
+          - samba-libs
+          - adcli
+          - python3-pexpect
+          - libpam-mount
+          - cifs-utils
+        state: present
+        update_cache: yes
+
+    - name: Crear ficheiro /etc/realmd.conf
+      copy:
+        dest: /etc/realmd.conf
+        content: "{{ realmd_conf }}"
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Descubrir o dominio
+      command: realm discover {{ dominio }}
+      register: realm_discover
+      changed_when: false
+
+    - debug:
+        var: realm_discover.stdout
+    - name: Unirse ao dominio usando expect
+      ansible.builtin.expect:
+        command: >
+          realm join -U {{ usuario_admin }} {{ dominio }}
+          --computer-name {{ inventory_hostname }}
+          --os-name "Linux Ubuntu"
+          --os-version "{{ ansible_distribution_version }}"
+        responses:
+          "Contraseña para administrator": "{{ admin_password }}"
+      register: join_result
+      args:
+        creates: /etc/krb5.keytab
+      when: "'{{ dominio }}' in realm_discover.stdout"
+
+    - debug:
+        var: join_result.stdout
+    - name: Copiar pam_mount
+      ansible.builtin.copy:
+        src: "pam_mount.conf.xml"
+        dest: "/etc/security/"
+
+    - name: Habilitar mkhomedir en PAM (para crear home al iniciar sesión)
+      lineinfile:
+        path: "{{ item }}"
+        regexp: '^session\s+required\s+pam_mkhomedir.so'
+        line: 'session required pam_mkhomedir.so skel=/etc/skel/ umask=0022'
+        state: present
+        insertafter: '^session\s+required'
+      loop:
+        - /etc/pam.d/common-session
+        - /etc/pam.d/common-session-noninteractive      

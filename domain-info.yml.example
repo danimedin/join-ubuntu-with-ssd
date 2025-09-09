@@ -1,0 +1,23 @@
+dominio: "contoso.com"
+realm: "CONTOSO.COM"
+controlador: "X.X.X.X"
+usuario_admin: "administrator"
+admin_password: "UN_PASSWORD"
+realmd_conf: |
+      [users]
+      default-home = /home/%U
+      default-shell = /bin/bash
+
+      [active-directory]
+      default-client = sssd
+      os-name = Linux Ubuntu
+
+      [service]
+      automatic-install = no
+
+      [contoso.com]
+      fully-qualified-names = no
+      automatic-id-mapping = yes
+      user-principal = yes
+      manage-system = yes
+
